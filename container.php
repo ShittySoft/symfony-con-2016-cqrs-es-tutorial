@@ -11,7 +11,11 @@ use Bernard\QueueFactory;
 use Bernard\QueueFactory\PersistentFactory;
 use Building\Domain\Aggregate\Building;
 use Building\Domain\Command;
+use Building\Domain\DomainEvent\NewBuildingWasRegistered;
+use Building\Domain\DomainEvent\UserCheckedIntoBuilding;
+use Building\Domain\DomainEvent\UserCheckedOutOfBuilding;
 use Building\Domain\Repository\BuildingRepositoryInterface;
+use Building\Infrastructure\Projector\PopulateCheckedInUsers;
 use Building\Infrastructure\Repository\BuildingRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\PDOSqlite\Driver;
@@ -221,6 +225,27 @@ return new ServiceManager([
                     new AggregateTranslator()
                 )
             );
+        },
+
+        NewBuildingWasRegistered::class . '-projectors' => function (ContainerInterface $container) {
+            return [
+                new PopulateCheckedInUsers($container->get(EventStore::class)),
+//                new AddBuilding(),
+            ];
+        },
+
+        UserCheckedIntoBuilding::class . '-projectors' => function (ContainerInterface $container) {
+            return [
+                new PopulateCheckedInUsers($container->get(EventStore::class)),
+//                new AddUserToCheckedInUsers(),
+            ];
+        },
+
+        UserCheckedOutOfBuilding::class . '-projectors' => function (ContainerInterface $container) {
+            return [
+                new PopulateCheckedInUsers($container->get(EventStore::class)),
+//                new RemoveUserFromCheckedInUsers(),
+            ];
         },
     ],
 ]);
