@@ -14,6 +14,7 @@ use Building\Domain\Command;
 use Building\Domain\DomainEvent\NewBuildingWasRegistered;
 use Building\Domain\DomainEvent\UserCheckedIntoBuilding;
 use Building\Domain\DomainEvent\UserCheckedOutOfBuilding;
+use Building\Domain\DomainEvent\UserCheckInAnomalyDetected;
 use Building\Domain\Repository\BuildingRepositoryInterface;
 use Building\Infrastructure\Projector\PopulateCheckedInUsers;
 use Building\Infrastructure\Repository\BuildingRepository;
@@ -217,6 +218,16 @@ return new ServiceManager([
                 $buildings->get($command->buildingId())->checkOutUser($command->username());
             };
         },
+        Command\NotifyAdminstratorOfUserCheckInAnomaly::class => function() {
+            return function (Command\NotifyAdminstratorOfUserCheckInAnomaly $command) {
+                error_log(sprintf(
+                    'User "%s" is cheating the system on building "%s"',
+                    $command->username(),
+                    (string) $command->buildingId()
+                ));
+            };
+        },
+
         BuildingRepositoryInterface::class => function (ContainerInterface $container) : BuildingRepositoryInterface {
             return new BuildingRepository(
                 new AggregateRepository(
@@ -245,6 +256,19 @@ return new ServiceManager([
             return [
                 new PopulateCheckedInUsers($container->get(EventStore::class)),
 //                new RemoveUserFromCheckedInUsers(),
+            ];
+        },
+
+        UserCheckInAnomalyDetected::class . '-listeners' => function (ContainerInterface $container) {
+            return [
+                function (UserCheckInAnomalyDetected $anomaly) use ($container) {
+                    $container
+                        ->get(CommandBus::class)
+                        ->dispatch(Command\NotifyAdminstratorOfUserCheckInAnomaly::fromBuildingAndUsername(
+                            $anomaly->buildingId(),
+                            $anomaly->username()
+                        ));
+                },
             ];
         },
     ],
